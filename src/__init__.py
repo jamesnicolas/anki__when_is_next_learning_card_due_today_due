@@ -10,7 +10,6 @@ from pprint import pprint as pp
 from anki.hooks import wrap
 import aqt
 from aqt import gui_hooks
-from aqt.deckbrowser import DeckBrowser
 from aqt.overview import Overview
 
 
@@ -85,7 +84,6 @@ def timeInAgo(t):
     else:
         msg += " ago"
     return msg
-
 
 def addRemainingTimeToDesc(overview, content):
     content.desc += whenIsNextLrnDue()
