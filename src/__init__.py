@@ -9,7 +9,8 @@ from pprint import pprint as pp
 
 from anki.hooks import wrap
 import aqt
-from aqt.deckbrowser import DeckBrowser
+from aqt import gui_hooks
+from aqt.overview import Overview
 
 
 def gc(arg, fail=False):
@@ -17,7 +18,8 @@ def gc(arg, fail=False):
 
 
 def whenIsNextLrnDue():
-    o = aqt.mw.col.db.all("""select id, due from cards where queue = 1 order by due""")
+    did = str(aqt.mw.col.decks.current()["id"])
+    o = aqt.mw.col.db.all("""select id, due from cards where queue = 1 and did = """ + did + """ order by due""")
     if o:
         o = dict(o)
         now = datetime.datetime.now()
@@ -52,20 +54,41 @@ def whenIsNextLrnDue():
             else:
                 f = "%H:%M"
             tstr = '''<a href=# style="text-decoration: none; color:black;"
-            onclick="return pycmd('BrowserSearch#%s')">%s</a>''' % (str(cid), cdo.strftime(f))
+            onclick="return pycmd('BrowserSearch#%s')">%s (%s)</a>''' % (str(cid), cdo.strftime(f), timeInAgo(cdo))
             msg = gc("sentence_beginning", "The next learning card due today is due at ") + tstr
             return "<div>" + msg + "</div>"
     else:
         return ""
 
-
-def deckbrowserMessage(self, _old):
-    if whenIsNextLrnDue():
-        return _old(self) + whenIsNextLrnDue()
+def timeInAgo(t):
+    zero = datetime.timedelta(0)
+    now = datetime.datetime.now()
+    td = t - now
+    due_later = True
+    if td < zero:
+        due_later = False
+        td = now - t
+    if int(td.total_seconds()) == 0:
+        return "now"
+    hours = int(td.total_seconds()/3600)
+    minutes = int(td.total_seconds()/60 % 60)
+    seconds = int(td.total_seconds() % 60)
+    msg = ""
+    if hours:
+        msg += "%dh" % (hours)
+    if minutes:
+        msg += "%dm" % (minutes)
+    msg += "%ds" % (seconds)
+    if due_later:
+        msg = "in " + msg
     else:
-        return _old(self)
-DeckBrowser._renderStats = wrap(DeckBrowser._renderStats, deckbrowserMessage, "around")
+        msg += " ago"
+    return msg
 
+def addRemainingTimeToDesc(overview, content):
+    content.desc += whenIsNextLrnDue()
+
+gui_hooks.overview_will_render_content.append(addRemainingTimeToDesc)
 
 def openBrowser(searchterm):
     browser = aqt.dialogs.open("Browser", aqt.mw)
@@ -83,4 +106,4 @@ def myLinkHandler(self, url, _old):
         openBrowser("cid:" + out)
     else:
         return _old(self, url)
-DeckBrowser._linkHandler = wrap(DeckBrowser._linkHandler, myLinkHandler, "around")
+Overview._linkHandler = wrap(Overview._linkHandler, myLinkHandler, "around")
